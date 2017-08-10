@@ -1,0 +1,99 @@
+'''
+        1) This script generates the final compliance text.
+        2) Command to run the script:
+                python Generate_OSS_compliance_text.py analyzed_file.xls compliance_format.xlsx
+
+        3) Analyzed file format should be the latest file downloaded from the code center OSS report generation. (spudsoft Excel)
+        4) Please take care while downloading the report from the code center. File type should be ***spudsoft Excel***
+
+        5) Compliance_format should be maintained as attached in the mail.
+                Sheet1
+                cols1: License name
+                cols2: Compliance text
+                cols3: License text
+
+        6) Before running this script. Make sure you have installed xlrd package.
+                pip install xlrd
+'''
+
+
+import os
+import sys
+import xlrd
+
+
+#Check for the valid files!!
+if not os.path.isfile(sys.argv[1]):
+	raise Exception("File ** %s ** does not exist!!\n Please check the file location!!"%sys.argv[1])
+elif not os.path.isfile(sys.argv[2]):
+	raise Exception("File ** %s ** does not exist!!\n Please check the file location!!"%sys.argv[2])
+
+
+#Parse analyzed file.
+try:	
+	analyzed_file = xlrd.open_workbook(sys.argv[1])
+except Exception:
+	raise Exception("Please install xlrd package!!\nCommand to install the package - (pip install xlrd)")
+else:
+        if "OSS components" not in analyzed_file.sheet_names():
+                raise Exception("Please rename the component list sheet name to **OSS components**!!")
+        else:        
+                analyzed_sheet = analyzed_file.sheet_by_name("OSS components")
+
+
+#Parse formated compliance file
+try:	
+	formated_file = xlrd.open_workbook(sys.argv[2])
+except Exception:
+	raise Exception("Please install xlrd package!!\nCommand to install the package - (pip install xlrd)")
+else:
+        formated_sheet = formated_file.sheet_by_name("Sheet1")
+       
+
+
+#This function convert the file into dictionary!!
+#generate_dictionary : file_name , file_type (compliance | analysis)        
+def generate_dictionary(scan_file, file_type):
+
+        file_dict = {}
+        if file_type == "compliance":
+                for row in range(1,scan_file.nrows):               
+                        if scan_file.row_values(row)[0] not in ["License", None ,""]:
+                                 file_dict["%s"%scan_file.row_values(row)[0]] = scan_file.row_values(row)[1]    
+        elif file_type == "analysis":
+                for row in range(1,scan_file.nrows):
+                        if (scan_file.row_values(row)[13] not in ["APPROVED", "Approved", "License", "", None,"Commercial","commercial"]): 
+                                continue
+                        else:
+                              if scan_file.row_values(row)[10] in file_dict.keys():
+                                      file_dict[scan_file.row_values(row)[10]].append({'%s'%scan_file.row_values(row)[6]:'%s'%scan_file.row_values(row)[7]})
+                              else:
+                                      file_dict[scan_file.row_values(row)[10]] = [{'%s'%scan_file.row_values(row)[6]:'%s'%scan_file.row_values(row)[7]}]
+        else:
+                raise Exception("Invalid file type parameter!!")
+                                
+        return  file_dict
+
+        
+                           
+def main():
+
+        compliance_dict = {}
+        analyzed_dict = {}
+        compliance_dict = generate_dictionary(formated_sheet, "compliance")
+        analyzed_dict = generate_dictionary(analyzed_sheet, "analysis")
+
+        final_compliance_text = ""
+        for cmp in compliance_dict:
+                for key,value in analyzed_dict.items():
+                        if key.find(cmp) == 0:
+                                final_compliance_text += "%s\n"%compliance_dict[cmp]
+
+        
+        print("Final compliance text:\n\n%s"%final_compliance_text)
+
+
+
+        
+if __name__ == '__main__':
+        main()
